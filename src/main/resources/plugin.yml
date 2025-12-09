@@ -1,0 +1,5 @@
+name: SmartMapLoader
+version: '1.0'
+main: io.github.md5sha256.SmartMapLoader.SmartMapLoader
+api-version: '1.21'
+author: 'andrewandy'
