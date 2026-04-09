@@ -1,7 +1,9 @@
 package io.github.md5sha256.SmartMapLoader;
 
 import io.papermc.paper.event.packet.PlayerChunkLoadEvent;
-import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import org.bukkit.Material;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemFrame;
@@ -9,6 +11,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerShowEntityEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -17,6 +20,9 @@ import org.bukkit.map.MapView;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class SmartMapLoader extends JavaPlugin implements Listener {
+   private static final long MAP_SEND_DEDUPE_MS = 300L;
+   private final Map<UUID, Map<Integer, Long>> lastMapSendByPlayer = new HashMap<>();
+
    public void onEnable() {
       this.getServer().getPluginManager().registerEvents(this, this);
    }
@@ -28,15 +34,16 @@ public final class SmartMapLoader extends JavaPlugin implements Listener {
    public void onChunkSend(PlayerChunkLoadEvent event) {
       Entity[] entities = event.getChunk().getEntities();
       Player player = event.getPlayer();
-      Arrays.stream(entities)
-            .filter(ItemFrame.class::isInstance)
-            .map(ItemFrame.class::cast)
-            .forEach(frame -> {
-               ItemStack item = frame.getItem();
-               if (item != null) {
-                  this.showMapItem(item, player);
-               }
-            });
+      for (Entity entity : entities) {
+         if (!(entity instanceof ItemFrame frame)) {
+            continue;
+         }
+
+         ItemStack item = frame.getItem();
+         if (item != null) {
+            this.showMapItem(item, player);
+         }
+      }
    }
 
    @EventHandler
@@ -67,8 +74,15 @@ public final class SmartMapLoader extends JavaPlugin implements Listener {
             return;
          }
 
-         itemFrame.getTrackedBy().forEach(viewer -> this.showMapItem(frameItem, viewer));
+         for (Player viewer : itemFrame.getTrackedBy()) {
+            this.showMapItem(frameItem, viewer);
+         }
       });
+   }
+
+   @EventHandler
+   public void onPlayerQuit(PlayerQuitEvent event) {
+      this.lastMapSendByPlayer.remove(event.getPlayer().getUniqueId());
    }
 
    private void showMapItem(ItemStack item, Player player) {
@@ -82,9 +96,22 @@ public final class SmartMapLoader extends JavaPlugin implements Listener {
       }
       
       MapView mapView = mapMeta.getMapView();
-      if (mapView != null) {
+      if (mapView != null && this.shouldSendMap(player, mapView.getId())) {
          player.sendMap(mapView);
       }
+   }
+
+   private boolean shouldSendMap(Player player, int mapId) {
+      long now = System.currentTimeMillis();
+      UUID playerId = player.getUniqueId();
+      Map<Integer, Long> lastSentByMap = this.lastMapSendByPlayer.computeIfAbsent(playerId, key -> new HashMap<>());
+      Long lastSentAt = lastSentByMap.get(mapId);
+      if (lastSentAt != null && now - lastSentAt < MAP_SEND_DEDUPE_MS) {
+         return false;
+      }
+
+      lastSentByMap.put(mapId, now);
+      return true;
    }
 }
 
