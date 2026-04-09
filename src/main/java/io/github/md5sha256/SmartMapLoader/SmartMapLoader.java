@@ -8,6 +8,7 @@ import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerShowEntityEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -47,6 +48,27 @@ public final class SmartMapLoader extends JavaPlugin implements Listener {
             this.showMapItem(item, event.getPlayer());
          }
       }
+   }
+
+   @EventHandler
+   public void onMapPlacedInItemFrame(PlayerInteractEntityEvent event) {
+      if (!(event.getRightClicked() instanceof ItemFrame itemFrame)) {
+         return;
+      }
+
+      ItemStack heldItem = event.getPlayer().getInventory().getItem(event.getHand());
+      if (heldItem == null || heldItem.getType() != Material.FILLED_MAP) {
+         return;
+      }
+
+      this.getServer().getScheduler().runTask(this, () -> {
+         ItemStack frameItem = itemFrame.getItem();
+         if (frameItem == null || frameItem.getType() != Material.FILLED_MAP) {
+            return;
+         }
+
+         itemFrame.getTrackedBy().forEach(viewer -> this.showMapItem(frameItem, viewer));
+      });
    }
 
    private void showMapItem(ItemStack item, Player player) {
