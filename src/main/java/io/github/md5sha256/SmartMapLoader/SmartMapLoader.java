@@ -23,10 +23,12 @@ public final class SmartMapLoader extends JavaPlugin implements Listener {
    private static final long MAP_SEND_DEDUPE_MS = 300L;
    private final Map<UUID, Map<Integer, Long>> lastMapSendByPlayer = new HashMap<>();
 
+   @Override
    public void onEnable() {
       this.getServer().getPluginManager().registerEvents(this, this);
    }
 
+   @Override
    public void onDisable() {
    }
 
@@ -40,7 +42,7 @@ public final class SmartMapLoader extends JavaPlugin implements Listener {
          }
 
          ItemStack item = frame.getItem();
-         if (item != null) {
+         if (!item.getType().isAir()) {
             this.showMapItem(item, player);
          }
       }
@@ -51,7 +53,7 @@ public final class SmartMapLoader extends JavaPlugin implements Listener {
       Entity entity = event.getEntity();
       if (entity instanceof ItemFrame itemFrame) {
          ItemStack item = itemFrame.getItem();
-         if (item != null) {
+         if (!item.getType().isAir()) {
             this.showMapItem(item, event.getPlayer());
          }
       }
@@ -64,13 +66,13 @@ public final class SmartMapLoader extends JavaPlugin implements Listener {
       }
 
       ItemStack heldItem = event.getPlayer().getInventory().getItem(event.getHand());
-      if (heldItem == null || heldItem.getType() != Material.FILLED_MAP) {
+      if (heldItem.getType() != Material.FILLED_MAP) {
          return;
       }
 
       this.getServer().getScheduler().runTask(this, () -> {
          ItemStack frameItem = itemFrame.getItem();
-         if (frameItem == null || frameItem.getType() != Material.FILLED_MAP) {
+         if (frameItem.getType().isAir() || frameItem.getType() != Material.FILLED_MAP) {
             return;
          }
 
@@ -86,7 +88,7 @@ public final class SmartMapLoader extends JavaPlugin implements Listener {
    }
 
    private void showMapItem(ItemStack item, Player player) {
-      if (item == null || item.getType() != Material.FILLED_MAP || !item.hasItemMeta()) {
+      if (item.getType().isAir() || item.getType() != Material.FILLED_MAP || !item.hasItemMeta()) {
          return;
       }
       
